@@ -32,10 +32,7 @@ public class UserAuthenticationController : ControllerBase
         var existingUser = _context.Users
             .FirstOrDefault(u => u.Username == UserRequest.Username);
 
-        if (existingUser != null)
-        {
-            return BadRequest("Username already exists");
-        }
+        if (existingUser != null) return BadRequest("Username already exists");
 
         var userSalt = _pauliHelper.RandomString(16);
         var passwordHash = _pauliHelper.HashString(UserRequest.Password + userSalt);
@@ -45,7 +42,9 @@ public class UserAuthenticationController : ControllerBase
             Id = Guid.NewGuid(),
             Username = UserRequest.Username,
             Password = passwordHash,
-            Salt = userSalt
+            Salt = userSalt,
+            // FriendRequests = new List<FriendRequest>(),
+            // Friends = new List<Friendship>()
         });
         await _context.SaveChangesAsync();
 
@@ -57,20 +56,13 @@ public class UserAuthenticationController : ControllerBase
     public IActionResult Login([FromBody] UserLoginDTO UserRequest)
     {
         var userSalt = _context.Users.Where(u => u.Username == UserRequest.Username).Select(u => u.Salt).FirstOrDefault();
-        if (userSalt == null)
-        {
-            return BadRequest("Wrong username or password");
-        }
-        
+        if (userSalt == null) return BadRequest("Wrong username or password");
         var passwordHash = _pauliHelper.HashString(UserRequest.Password + userSalt);
         
         var existingUser = _context.Users
             .Where(u => u.Username == UserRequest.Username && u.Password == passwordHash).FirstOrDefault();
 
-        if (existingUser == null)
-        {
-            return BadRequest("Wrong username or password");
-        }
+        if (existingUser == null) return BadRequest("Wrong username or password");
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(_config["Jwt:Key"]);

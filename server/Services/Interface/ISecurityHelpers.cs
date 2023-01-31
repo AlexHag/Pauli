@@ -6,5 +6,5 @@ public interface IPauliHelper
 {
     public string RandomString(int length);
     public string HashString(string input);
-    public User? GetRequestUser(HttpContext context);
+    public Guid GetRequestUserId(HttpContext context);
 }

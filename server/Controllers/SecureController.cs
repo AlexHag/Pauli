@@ -15,25 +15,23 @@ public class SecureController : ControllerBase
 {
     private ApplicationDbContext _context;
     private readonly IConfiguration _config;
-    private readonly IPauliHelper pauliHelper;
+    private readonly IPauliHelper _pauliHelper;
 
 
-    public SecureController(ApplicationDbContext context, IConfiguration config, IPauliHelper securityHelpers)
+    public SecureController(ApplicationDbContext context, IConfiguration config, IPauliHelper pauliHelper)
     {
         _context = context;
         _config = config;
-        pauliHelper = securityHelpers;
+        _pauliHelper = pauliHelper;
     }
 
     [HttpGet]
     [Authorize]
     public IActionResult Get()
     {
-        var user = pauliHelper.GetRequestUser(HttpContext);
-        if (user == null)
-        {
-            return BadRequest("User not found from JWT claim. This should not be possible.");
-        }
+        var userId = _pauliHelper.GetRequestUserId(HttpContext);
+        var user = _context.Users.Find(userId);
+        if (user == null) return BadRequest("User not found from JWT claim. This should not be possible.");
         
         return Ok($"Hello {user.Username}");
     }

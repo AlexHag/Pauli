@@ -37,23 +37,22 @@ public class PauliHelper : IPauliHelper
         return Sb.ToString();
     }
 
-    public User? GetRequestUser(HttpContext context)
+    public Guid GetRequestUserId(HttpContext context)
     {
         var identity = context.User.Identity as ClaimsIdentity;
         if(identity == null)
         {
-            return null;
+            return Guid.Empty;
         }
 
         IEnumerable<Claim> claims = identity.Claims; 
-        var claimId = identity.FindFirst("Id").Value;
-        var user = _context.Users.Where(u => u.Id == Guid.Parse(claimId)).FirstOrDefault();
+        var claimId = identity.FindFirst("Id")?.Value;
         
-        if(user == null)
+        if(claimId == null)
         {
-            return null;
+            return Guid.Empty;
         }
 
-        return user;
+        return Guid.Parse(claimId);
     }
 }
