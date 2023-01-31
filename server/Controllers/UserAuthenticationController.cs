@@ -1,30 +1,35 @@
 using server.Models;
 using server.DataBase;
+using server.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 
+
 namespace server.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class UserAccountController : ControllerBase
+[Route("api")]
+public class UserAuthenticationController : ControllerBase
 {
     private ApplicationDbContext _context;
     private readonly IConfiguration _config;
+    private readonly IPauliHelper _pauliHelper;
 
-    public UserAccountController(ApplicationDbContext context, IConfiguration config)
+    public UserAuthenticationController(ApplicationDbContext context, IConfiguration config, IPauliHelper pauliHelper)
     {
         _context = context;
         _config = config;
+        _pauliHelper = pauliHelper;
     }
 
-    [HttpPost("register")]
+    [HttpPost]
+    [Route("register")]
     public async Task<IActionResult> Register([FromBody] UserLoginDTO UserRequest)
     {
-        var existingUser = _context.UserAccounts
+        var existingUser = _context.Users
             .FirstOrDefault(u => u.Username == UserRequest.Username);
 
         if (existingUser != null)
@@ -32,27 +37,39 @@ public class UserAccountController : ControllerBase
             return BadRequest("Username already exists");
         }
 
-        await _context.UserAccounts.AddAsync(new UserAccount 
+        var userSalt = _pauliHelper.RandomString(16);
+        var passwordHash = _pauliHelper.HashString(UserRequest.Password + userSalt);
+
+        await _context.Users.AddAsync(new User 
         {
             Id = Guid.NewGuid(),
             Username = UserRequest.Username,
-            // Hash and salt this asap!
-            Password = UserRequest.Password
+            Password = passwordHash,
+            Salt = userSalt
         });
         await _context.SaveChangesAsync();
 
         return Ok();
     }
 
-    [HttpPost("login")]
+    [HttpPost]
+    [Route("login")]
     public IActionResult Login([FromBody] UserLoginDTO UserRequest)
     {
-        var existingUser = _context.UserAccounts
-            .Where(u => u.Username == UserRequest.Username && u.Password == UserRequest.Password).FirstOrDefault();
+        var userSalt = _context.Users.Where(u => u.Username == UserRequest.Username).Select(u => u.Salt).FirstOrDefault();
+        if (userSalt == null)
+        {
+            return BadRequest("Wrong username or password");
+        }
+        
+        var passwordHash = _pauliHelper.HashString(UserRequest.Password + userSalt);
+        
+        var existingUser = _context.Users
+            .Where(u => u.Username == UserRequest.Username && u.Password == passwordHash).FirstOrDefault();
 
         if (existingUser == null)
         {
-            return BadRequest();
+            return BadRequest("Wrong username or password");
         }
 
         var tokenHandler = new JwtSecurityTokenHandler();

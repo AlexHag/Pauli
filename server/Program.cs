@@ -1,4 +1,5 @@
 using server.DataBase;
+using server.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -29,6 +30,8 @@ builder.Services.AddAuthentication(options =>
     };
 });
 builder.Services.AddAuthorization();
+
+builder.Services.AddScoped<IPauliHelper, PauliHelper>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
