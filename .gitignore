@@ -1,3 +1,7 @@
 server/bin
 server/obj
+serverControllerTest/bin
+serverControllerTest/obj
+serverMethodsTest/bin
+serverMethodsTest/obj
 .vscode

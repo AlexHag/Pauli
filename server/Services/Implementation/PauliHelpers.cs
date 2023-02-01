@@ -14,6 +14,10 @@ public class PauliHelper : IPauliHelper
     {
         _context = context;
     }
+
+    public PauliHelper() 
+    { }
+
     public string RandomString(int length)
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -42,7 +46,7 @@ public class PauliHelper : IPauliHelper
         var identity = context.User.Identity as ClaimsIdentity;
         if(identity == null)
         {
-            return Guid.Empty;
+            throw new Exception("Identity is null. This should not happen and be handeled by the [Authorize] attribute.");
         }
 
         IEnumerable<Claim> claims = identity.Claims; 
@@ -50,7 +54,7 @@ public class PauliHelper : IPauliHelper
         
         if(claimId == null)
         {
-            return Guid.Empty;
+            throw new Exception("Identity is null. This should not happen and be handeled by the [Authorize] attribute.");
         }
 
         return Guid.Parse(claimId);

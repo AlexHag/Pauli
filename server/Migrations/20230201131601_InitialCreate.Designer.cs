@@ -12,7 +12,7 @@ using server.DataBase;
 namespace server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20230131184343_InitialCreate")]
+    [Migration("20230201131601_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -31,21 +31,23 @@ namespace server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("FromId")
+                    b.Property<Guid>("RecieverId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("FromUsername")
+                    b.Property<string>("RecieverUsername")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid?>("UserId")
+                    b.Property<Guid>("SenderId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SenderUsername")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
-
-                    b.ToTable("FriendRequest");
+                    b.ToTable("FriendRequests");
                 });
 
             modelBuilder.Entity("server.Models.Friendship", b =>
@@ -54,10 +56,17 @@ namespace server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("FriendId")
+                    b.Property<Guid>("AliceId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("FriendUsername")
+                    b.Property<string>("AliceUsername")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("BobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BobUsername")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -67,14 +76,9 @@ namespace server.Migrations
                     b.Property<DateTime?>("TimeBeenFriends")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Friendship");
+                    b.ToTable("Friendships");
                 });
 
             modelBuilder.Entity("server.Models.User", b =>
@@ -98,27 +102,6 @@ namespace server.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("server.Models.FriendRequest", b =>
-                {
-                    b.HasOne("server.Models.User", null)
-                        .WithMany("FriendRequests")
-                        .HasForeignKey("UserId");
-                });
-
-            modelBuilder.Entity("server.Models.Friendship", b =>
-                {
-                    b.HasOne("server.Models.User", null)
-                        .WithMany("Friends")
-                        .HasForeignKey("UserId");
-                });
-
-            modelBuilder.Entity("server.Models.User", b =>
-                {
-                    b.Navigation("FriendRequests");
-
-                    b.Navigation("Friends");
                 });
 #pragma warning restore 612, 618
         }

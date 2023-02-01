@@ -31,23 +31,29 @@ public class FriendsController : ControllerBase
     [Route("sendfriendrequest")]
     public async Task<IActionResult> SendFriendRequest([FromBody] string Username)
     {
+        // Verify user.
         var userId = _pauliHelper.GetRequestUserId(HttpContext);
-        var user = _context.Users.Include(u => u.FriendRequests).SingleOrDefault(u => u.Id == userId);
-        
-        if (user == null) return Unauthorized("User not found from JWT claim.");
+        var user = _context.Users.Find(userId);
+        if (user == null) return BadRequest("User not found from JWT claim.");
 
-        var FriendWhoGotTheRequest = _context.Users.Include(u => u.FriendRequests).Where(u => u.Username == Username).FirstOrDefault();
+        // Find friend who recieved the request.
+        var FriendWhoGotTheRequest = _context.Users.Where(u => u.Username == Username).FirstOrDefault();
         if(FriendWhoGotTheRequest == null) return BadRequest("Unknown username");
         
-        var FriendRequestAlreadySent = FriendWhoGotTheRequest.FriendRequests.Where(p => p.FromId == user.Id).FirstOrDefault();
+        // See if the request was already sent.
+        var FriendRequestAlreadySent = _context.FriendRequests
+            .Where(p => p.SenderId == user.Id && p.RecieverId == FriendWhoGotTheRequest.Id).FirstOrDefault();
         if(FriendRequestAlreadySent != null) return BadRequest("Friend request already sent");
         
-        FriendWhoGotTheRequest.FriendRequests.Add(new FriendRequest
+        // Add friend request to the database.
+        _context.FriendRequests.Add(new FriendRequest
         {
-            FromId = user.Id,
-            FromUsername = user.Username
+            Id = Guid.NewGuid(),
+            SenderId = user.Id,
+            SenderUsername = user.Username,
+            RecieverId = FriendWhoGotTheRequest.Id,
+            RecieverUsername = FriendWhoGotTheRequest.Username
         });
-
         await _context.SaveChangesAsync();
 
         return Ok();
@@ -55,13 +61,53 @@ public class FriendsController : ControllerBase
 
     [HttpGet]
     [Authorize]
-    [Route("getfriendrequests")]
+    [Route("getrecievedfriendrequests")]
     public IActionResult GetFriendRequests()
     {
+        // Verify user.
         var userId = _pauliHelper.GetRequestUserId(HttpContext);
-        var user = _context.Users.Include(u => u.FriendRequests).SingleOrDefault(u => u.Id == userId);
-        if (user == null) return Unauthorized("User not found from JWT claim. Should not happen");
-        return Ok(user.FriendRequests);
+        var user = _context.Users.Find(userId);
+        if (user == null) return BadRequest("User not found from JWT claim.");
+
+        // Find friend requests the user has recieved and return them.
+        var FriendRequests = _context.FriendRequests.Where(p => p.RecieverId == user.Id).ToList();
+        return Ok(FriendRequests);
+    }
+
+    [HttpGet]
+    [Authorize]
+    [Route("getsentfriendrequests")]
+    public IActionResult GetSentFriendRequests()
+    {
+        // Verify user.
+        var userId = _pauliHelper.GetRequestUserId(HttpContext);
+        var user = _context.Users.Find(userId);
+        if (user == null) return BadRequest("User not found from JWT claim.");
+
+        // Find friend requests the user has sent and return them.
+        var FriendRequests = _context.FriendRequests.Where(p => p.SenderId == user.Id).ToList();
+        return Ok(FriendRequests);
+    }
+
+    [HttpDelete]
+    [Authorize]
+    [Route("removesentfriendrequests")]
+    public IActionResult RemoveSentFriendRequests([FromBody] Guid FriendRequestId)
+    {
+        // Verify user
+        var userId = _pauliHelper.GetRequestUserId(HttpContext);
+        var user = _context.Users.Find(userId);
+        if (user == null) return BadRequest("User not found from JWT claim.");
+        
+        // Find friend requests the user has sent.
+        var FriendRequest = _context.FriendRequests.Where(p => p.SenderId == user.Id && p.Id == FriendRequestId).SingleOrDefault();
+        if(FriendRequest == null) return NotFound();
+        
+        // Delete friend Request
+        _context.FriendRequests.Remove(FriendRequest);
+        _context.SaveChanges();
+        
+        return NoContent();
     }
 
     [HttpPost]
@@ -69,32 +115,67 @@ public class FriendsController : ControllerBase
     [Route("acceptfriendrequest")]
     public IActionResult AcceptFriendRequest([FromBody] Guid FriendRequestId)
     {
+        // Verify user
         var userId = _pauliHelper.GetRequestUserId(HttpContext);
-        var user = _context.Users.Include(u => u.FriendRequests).Include(u => u.Friends).SingleOrDefault(u => u.Id == userId);
-        if (user == null) return Unauthorized("User not found from JWT claim. Should not happen");
+        var user = _context.Users.Where(p => p.Id == userId).FirstOrDefault();
+        if (user == null) return BadRequest("User not found from JWT claim.");
 
-        var TheFriendRequest = user.FriendRequests.SingleOrDefault(fr => fr.Id == FriendRequestId);
-        if(TheFriendRequest == null) return BadRequest("No such friend request");
+        // Find the friend request the user has recieved.
+        var TheFriendRequest = _context.FriendRequests.FirstOrDefault(p => p.Id == FriendRequestId && p.RecieverId == userId);
+        if(TheFriendRequest == null) return NotFound("No such friend request");
 
-        user.Friends.Add(new Friendship
+        // Create a new friendship
+        var Friendship = new Friendship
         {
             Id = Guid.NewGuid(),
-            FriendId = TheFriendRequest.FromId,
-            FriendUsername = TheFriendRequest.FromUsername,
-            TimeBeenFriends = DateTime.UtcNow
-        });
+            AliceId = user.Id,
+            AliceUsername = user.Username,
+            BobId = TheFriendRequest.SenderId,
+            BobUsername = TheFriendRequest.SenderUsername,
+            TimeBeenFriends = DateTime.UtcNow,
+            FriendshipPoints = 0
+        };
 
-        var TheFriend = _context.Users.Include(u => u.Friends).SingleOrDefault(u => u.Id == TheFriendRequest.FromId);
-        if(TheFriend == null) return BadRequest("The friend does not exist, this should defenetly not happen...");
-        TheFriend.Friends.Add(new Friendship
-        {
-            Id = Guid.NewGuid(),
-            FriendId = user.Id,
-            FriendUsername = user.Username,
-            TimeBeenFriends = DateTime.UtcNow
-        });
-
+        // Add friendship to database and delete the friend request.
+        _context.Friendships.Add(Friendship);
+        _context.FriendRequests.Remove(TheFriendRequest);
         _context.SaveChanges();
+
         return Ok();
+    }
+
+    [HttpGet]
+    [Authorize]
+    [Route("detmyfriends")]
+    public IActionResult GetMyFriends()
+    {
+        // Verify user
+        var userId = _pauliHelper.GetRequestUserId(HttpContext);
+        var user = _context.Users.Where(p => p.Id == userId).FirstOrDefault();
+        if (user == null) return BadRequest("User not found from JWT claim.");
+
+        // Get list of friends
+        var UsersFriends = _context.Friendships.Where(f => f.AliceId == user.Id || f.BobId == user.Id).ToList();
+        return Ok(UsersFriends);
+    }
+
+    [HttpDelete]
+    [Authorize]
+    [Route("deleteonefriend")]
+    public IActionResult DeleteOneFriend([FromBody] Guid FriendshipId)
+    {
+        // Verify user
+        var userId = _pauliHelper.GetRequestUserId(HttpContext);
+        var user = _context.Users.Where(p => p.Id == userId).FirstOrDefault();
+        if (user == null) return BadRequest("User not found from JWT claim.");
+
+        // Look for friendship
+        var TheFriendShip = _context.Friendships.Find(FriendshipId);
+        if(TheFriendShip == null) return NotFound();
+        
+        // Delete friendship
+        _context.Friendships.Remove(TheFriendShip);
+        _context.SaveChanges();
+        return NoContent();
     }
 }
