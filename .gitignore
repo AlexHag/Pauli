@@ -4,4 +4,8 @@ serverControllerTest/bin
 serverControllerTest/obj
 serverMethodsTest/bin
 serverMethodsTest/obj
+client/frontend/node_modules
+client/frontend/dist
+client/backend/FrontConsole/bin
+client/backend/FrontConsole/obj
 .vscode
