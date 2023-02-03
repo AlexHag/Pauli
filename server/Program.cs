@@ -37,8 +37,11 @@ builder.Services.AddScoped<IPauliHelper, PauliHelper>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors();
 
 var app = builder.Build();
+
+app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().AllowCredentials().WithOrigins("http://localhost:3000"));
 
 if (app.Environment.IsDevelopment())
 {

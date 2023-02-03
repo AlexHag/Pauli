@@ -10,7 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api")]
 public class SecureController : ControllerBase
 {
     private ApplicationDbContext _context;
@@ -27,6 +27,7 @@ public class SecureController : ControllerBase
 
     [HttpGet]
     [Authorize]
+    [Route("securehello")]
     public IActionResult Get()
     {
         var userId = _pauliHelper.GetRequestUserId(HttpContext);
@@ -34,5 +35,13 @@ public class SecureController : ControllerBase
         if (user == null) return BadRequest("User not found from JWT claim. This should not be possible.");
         
         return Ok($"Hello {user.Username}");
+    }
+    
+    [Route("getip")]
+    [HttpGet]
+    public IActionResult GetClientIp()
+    {
+        string ClientIPAddr = HttpContext.Connection.RemoteIpAddress.ToString();
+        return Ok(ClientIPAddr);
     }
 }
